@@ -1,5 +1,5 @@
--- Top 20 SQL statement using same plan and consuming most memory from shared pool
--- if plan_hash_value equals 0, then insert or plsql statement then look for sql_text with substr.
+-- Top 20 SQL plans consuming most memory from shared pool
+-- if plan_hash_value equals 0, then insert or plsql statement, look for sql_text with substr.
 
 SELECT
     *
