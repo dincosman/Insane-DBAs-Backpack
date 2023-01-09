@@ -1,4 +1,4 @@
--- Top 20 SQL statement using same plan
+-- Top 20 SQL plans used from similar sql statements
 -- if plan_hash_value equals 0, then insert or plsql statement then look for sql_text with substr.
 
 SELECT
@@ -17,4 +17,4 @@ FROM
             2 DESC
     )
 WHERE
-    ROWNUM < 20;
+    ROWNUM <= 20;
