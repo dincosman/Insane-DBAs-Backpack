@@ -17,4 +17,4 @@ FROM
             3 DESC
     )
 WHERE
-    ROWNUM < 20;
+    ROWNUM <= 20;
