@@ -1,0 +1,4 @@
+[oracle@oracc ~]$ /u01/app/oracle/em135/oms/bin/emcli db_software_maintenance -performOperation -name=DB_UPDATE_sundb \
+-purpose=UPDATE_RACDB -target_list=sundb.bjk -target_type=rac_database -dataguard_role=primary \
+-normal_credential=@S001ORAVT03-04:SYSMAN -privilege_credential=ROOT@ORAVT03-04:SYSMAN -database_credential=SYS@SUNDB:SYSMAN \
+-rolling=true -node_list="oravt03.bjk,oravt04.bjk"
