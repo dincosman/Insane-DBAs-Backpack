@@ -1,0 +1,18 @@
+[oracle@oravt01 grid]$ export CV_ASSUME_DISTID=OL7 ./runInstaller -applyRU /u01/app/Setup/DBRU/35320081
+-applyOneOffs /u01/app/Setup/OJVM/35354406,/u01/app/Setup/DPBP/35512813,/u01/app/Setup/Spatial/35602358,/u01/app/Setup/DBRU_Oneoff/30787757,/u01/app/Setup/DBRU_Oneoff/35372179,/u01/app/Setup/GIMRP/35656840/35571653,/u01/app/Setup/GIMRP/35656840/35156218,/u01/app/Setup/GIMRP/35656840/35395648,/u01/app/Setup/GIMRP/35656840/35499173,/u01/app/Setup/GIMRP/35656840/35525143,/u01/app/Setup/GIMRP/35656840/35585502,/u01/app/Setup/GIMRP/35656840/35655714
+-silent -ignorePrereqFailure -waitforcompletion
+oracle.install.option=INSTALL_DB_SWONLY
+UNIX_GROUP_NAME=oinstall
+INVENTORY_LOCATION=/u01/app/oraInventory
+ORACLE_BASE=/u01/app/oracle
+ORACLE_HOME=/u01/app/oracle/product/19.20/dbhome_1
+oracle.install.db.InstallEdition=EE
+oracle.install.db.OSDBA_GROUP=dba
+oracle.install.db.OSOPER_GROUP=oper
+oracle.install.db.OSBACKUPDBA_GROUP=backupdba
+oracle.install.db.OSDGDBA_GROUP=dgdba
+oracle.install.db.OSKMDBA_GROUP=kmdba
+oracle.install.db.OSRACDBA_GROUP=racdba
+oracle.install.db.CLUSTER_NODES=oravt01,oravt02
+SECURITY_UPDATES_VIA_MYORACLESUPPORT=false
+DECLINE_SECURITY_UPDATES=true
