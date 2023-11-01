@@ -1,0 +1,9 @@
+[oracle@oracc Setup]$ vi /u01/app/Setup/db_deploy_gold_image.txt
+  NEW_ORACLE_HOME_LIST=/u01/app/oracle/product/19.20/dbhome_1
+  workingDir=/tmp
+  SKIP_PREREQUISITE_CHECKS=true
+  SKIP_CVU_CHECK=true
+				
+[oracle@oracc Setup]$ /u01/app/oracle/em135/oms/bin/emcli db_software_maintenance -performOperation -name=DB_DEPLOY_sundb \
+-purpose=DEPLOY_RAC_SOFTWARE -target_list=sundb.bjk -target_type=rac_database -normal_credential=ORACLE@ORAVT03-04:SYSMAN \
+-privilege_credential=ROOT@ORAVT03-04:SYSMAN -input_file="data:/u01/app/Setup/db_deploy_gold_image.txt"
