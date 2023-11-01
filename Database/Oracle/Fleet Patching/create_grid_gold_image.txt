@@ -1,0 +1,3 @@
+[oracle@oracc oms]$ /u01/app/oracle/em135/oms/bin/emcli login -username=SYSMAN
+[oracle@oracc Setup]$ /u01/app/oracle/em135/oms/bin/emcli db_software_maintenance -createSoftwareImage \
+-input_file="data:/u01/app/Setup/grid_create_gold_image.rsp"
