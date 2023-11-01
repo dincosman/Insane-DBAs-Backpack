@@ -1,0 +1,2 @@
+[oracle@s001oracc Setup]$ /u01/app/oracle/em135/oms/bin/emcli db_software_maintenance -subscribeTarget -target_name=oracluster2 \
+-target_type=cluster -image_id=05161B2BF0C08F94E063CF14285FC25B
