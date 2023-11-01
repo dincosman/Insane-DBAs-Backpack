@@ -1,0 +1,12 @@
+[oracle@oravt01 ~]$ /u01/app/oracle/em_agent/GoldImage_GI135v6/agent_13.5.0.0.0/bin/emctl config agent listtargets | grep oracle_home
+	[OraGI19Home1_1_oravt01.bjk_3271, oracle_home]      
+	[OraDB19Home1_2_oravt01.bjk_6741, oracle_home]        ---> OLD_DB_HOME - double check from EMCC targets menu.
+	[OraHome2_4_oravt01.bjk_2369, oracle_home]
+	[OraGI19Home2_5_oravt01.bjk_1255, oracle_home]          
+	[OraDB19Home2_6_oravt01.bjk_5493, oracle_home]
+
+[oracle@oracc Setup]$  /u01/app/oracle/em135/oms/bin/emcli db_software_maintenance -performOperation -name="CLEANUP_SOFTWARE_oravt0102db" \
+-purpose="CLEANUP_SOFTWARE" -target_list=OraDB19Home1_2_oravt01.bjk_6741,OraDB19Home1_2_oravt02.bjk_6741 -target_type=oracle_home \
+-normal_credential=ORACLE@ORAVT01-02:SYSMAN -privilege_credential=ROOT@ORAVT01-02:SYSMAN -workDir=/tmp
+		
+[oracle@oravt01 ~]$ rm -rf /u01/app/oracle/product/19.0.0.0
