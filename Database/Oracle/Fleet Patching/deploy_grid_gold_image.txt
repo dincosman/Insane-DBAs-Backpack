@@ -1,0 +1,9 @@
+[oracle@oracc Setup]$ vi /u01/app/Setup/grid_deploy_gold_image.txt
+  NEW_ORACLE_HOME_LIST=/u01/app/19.20/grid
+  workingDir=/tmp
+  SKIP_PREREQUISITE_CHECKS=true
+  SKIP_CVU_CHECK=true
+
+[oracle@oracc Setup]$ /u01/app/oracle/em135/oms/bin/emcli db_software_maintenance -performOperation -name=GRID_DEPLOY_oracluster2 \
+-purpose=DEPLOY_GI_SOFTWARE -target_list=oracluster2 -target_type=cluster -normal_credential=ORACLE@ORAVT03-04:SYSMAN \
+-privilege_credential=ROOT@ORAVT03-04:SYSMAN -input_file="data:/u01/app/Setup/grid_deploy_gold_image.txt"
