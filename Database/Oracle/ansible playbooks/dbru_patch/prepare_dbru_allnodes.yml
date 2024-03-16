@@ -1,0 +1,14 @@
+---
+- hosts: dbservers
+  vars:
+    NEWDBHOME: /u01/app/oracle/product/19.22/dbhome_1
+    patch_dir: /u01/app/Setup
+  remote_user: oracle
+  tasks:
+
+  - name: prepare_patch_dir for setup files
+    action: file dest={{ patch_dir }} state=directory owner=oracle group=oinstall
+
+  - name: prepare_new_dbhome
+    action: file dest={{ NEWDBHOME }} state=directory owner=oracle group=oinstall
+

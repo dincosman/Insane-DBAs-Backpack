@@ -1,0 +1,43 @@
+---
+- hosts: dbservers
+  vars:
+    OLDDBHOME: /u01/app/oracle/product/19.20/dbhome
+    patch_dir: /u01/app/Setup
+    ansible_python_interpreter: /usr/bin/python3
+    removed_value: REMOVED="T"/>
+  remote_user: root
+  tasks:
+  
+  - name: deinstall old_dbhome
+    become: yes
+    become_user: oracle
+    become_method: su
+    ansible.builtin.expect:
+      command: /bin/bash -c {{ OLDDBHOME }}/deinstall/deinstall
+      responses:
+        'Do you want to continue': 'y'
+        'Specify the list of database names': ''
+      echo: yes
+      timeout: 600
+    run_once: true
+    register: deinstall_result
+
+  - name: check inventory whether old_dbhome is tagged with removed flag
+    action:  shell echo $(grep "{{ OLDDBHOME }}" /u01/app/oraInventory/ContentsXML/inventory.xml | awk '{ print $NF }')
+    register: removedflag
+
+  - name: remove old db_home directory
+    action:  shell export OLDDBHOME={{ OLDDBHOME}}; rm -rf "$(dirname "$OLDDBHOME")"
+      when: deinstall_result.rc == 0 or removedflag.stdout ==  removed_value 
+
+  - name: remove GIRU folder from stage directory
+    file: path={{ patch_dir }}/GIRU state=absent
+    run_once: true
+
+  - name: remove OJVM folder from stage directory
+    file: path={{ patch_dir }}/OJVM state=absent
+    run_once: true
+
+  - name: remove opatch.zip file from stage directory
+    file: path={{ patch_dir }}/p6880880_122010_Linux-x86-64.zip state=absent
+    run_once: true

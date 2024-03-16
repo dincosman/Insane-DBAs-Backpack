@@ -1,0 +1,34 @@
+---
+- hosts: dbservers
+  vars:
+    DBHOME: /u01/app/oracle/product/19.22/dbhome_1
+    recovery_script_dest_dir: /home/oracle
+    recovery_script_dir: /etc/ansible/projects
+    patch_dir: /u01/app/Setup
+  remote_user: oracle
+  tasks:
+
+  - name: register instances
+    action: shell ps -ef | grep  ora_pmon | grep -v grep | awk '{ print $NF }' | cut -c10-50
+    register: find_instances
+
+  - name: Copy start recovery file to remote server
+    copy:
+      src: "{{ recovery_script_dir }}/start_recover_onremote.sh"
+      dest: "{{ recovery_script_dest_dir }}"
+      owner: oracle
+      group: oinstall
+      mode: '750'
+
+  - debug:
+      var: item
+    with_items: "{{ find_instances.stdout_lines }}"
+
+  - name: start_recovery
+    action: shell {{ recovery_script_dest_dir }}/start_recover_onremote.sh {{ item }} {{ DBHOME }}
+    with_items: "{{ find_instances.stdout_lines }}"
+    register: recovery_output
+
+  - debug:
+      var: item.stdout
+    with_items: "{{ recovery_output['results'] }}"

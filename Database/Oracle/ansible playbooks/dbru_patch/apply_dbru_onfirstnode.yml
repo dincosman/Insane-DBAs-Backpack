@@ -1,0 +1,103 @@
+---
+- hosts: dbservers
+  vars:
+    u01_size_mb: 11045
+    NEWDBHOME: /u01/app/oracle/product/19.22/dbhome_1
+    OLDDBHOME: /u01/app/oracle/product/19.20/dbhome_1
+    GRIDHOME: /u01/app/19.241/grid
+    patch_dir: /u01/app/Setup
+  remote_user: oracle
+  tasks:
+
+  - name: unzip new db_home
+    action: shell unzip -oq {{ patch_dir }}/LINUX.X64_193000_db_home.zip -d {{ NEWDBHOME}}
+    args:
+      warn: false
+
+  - name: unzip OPatch to new db_home
+    action: shell unzip -oq {{ patch_dir }}/p6880880_122010_Linux-x86-64.zip -d {{ NEWDBHOME }}
+    args:
+      warn: false    
+
+  - name: prepare_sub_patches
+    action: file dest={{ patch_dir }}/OJVM state=directory owner=oracle group=oinstall
+
+  - name: unzip OJVM patch
+    action:  shell unzip -oq {{ patch_dir }}/p35926646_190000_Linux-x86-64.zip -d {{ patch_dir }}/OJVM
+    args:
+      warn: false
+
+  - name: register cluster nodes for responsefile
+    action:  shell echo $({{ GRIDHOME }}/bin/olsnodes | tr '\n' ',' | sed 's/,\s*$//')
+    register: cluster_nodes
+ 
+  - name: register osdba value for responsefile
+    action:  shell grep "OSDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
+    register: osdba
+
+  - name: register osoper value for responsefile
+    action:  shell grep "OSOPER_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
+    register: osoper
+
+  - name: register osbackupdba value for responsefile
+    action:  shell grep "OSBACKUPDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
+    register: osbackupdba
+
+  - name: register osdgdba value for responsefile
+    action:  shell grep "OSDGDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
+    register: osdgdba
+
+  - name: register oskmdba value for responsefile
+    action:  shell grep "OSKMDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
+    register: oskmdba
+
+  - name: register osracdba value for responsefile
+    action:  shell grep "OSRACDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
+    register: osracdba
+
+  - name: create contents of responsefile
+    copy:
+      dest: "{{ patch_dir }}/db_oop1922.rsp"
+      content: |
+        oracle.install.responseFileVersion=/oracle/install/rspfmt_dbinstall_response_schema_v19.0.0
+        oracle.install.option=INSTALL_DB_SWONLY 
+        UNIX_GROUP_NAME=oinstall 
+        INVENTORY_LOCATION=/u01/app/oraInventory 
+        ORACLE_BASE=/u01/app/oracle 
+        ORACLE_HOME={{ NEWDBHOME }}
+        oracle.install.db.InstallEdition=EE 
+        {{ osdba.stdout }}
+        {{ osoper.stdout }}
+        {{ osbackupdba.stdout }}
+        {{ osdgdba.stdout }}
+        {{ oskmdba.stdout }}
+        {{ osracdba.stdout }}
+        oracle.install.db.CLUSTER_NODES={{ cluster_nodes.stdout }}
+        SECURITY_UPDATES_VIA_MYORACLESUPPORT=false 
+        DECLINE_SECURITY_UPDATES=true
+
+  - name: clean up dbhome zip files
+    file: path={{ patch_dir }}/LINUX.X64_193000_db_home.zip state=absent
+
+  - name: clean up OJVM patch zip files
+    file: path={{ patch_dir }}/p35926646_190000_Linux-x86-64.zip state=absent
+
+  - name: clean up oneoff patch zip files
+    file: path={{ patch_dir }}/p34672698_1922000DBRU_Linux-x86-64.zip state=absent
+
+  - name: clean up GIRU patch zip files
+    file: path={{ patch_dir }}/p35940989_190000_Linux-x86-64.zip state=absent
+
+  - name: check u01 free disk space
+    action: shell df -P /u01 | awk 'END { print $4 }'
+    register: u01size
+    failed_when: u01size.stdout|int <  u01_size_mb  * 1024
+
+  - name: apply dbru and oneoffs
+    action: shell export CV_ASSUME_DISTID=OL7; export NEWDBHOME={{ NEWDBHOME}}; $NEWDBHOME/runInstaller -silent -ignorePrereqFailure -waitforcompletion -applyRU {{ patch_dir }}/GIRU/35940989  -applyOneOffs {{ patch_dir }}/OJVM/35926646,{{ patch_dir }}/GIRUOneoff/34672698 -responsefile {{ patch_dir }}/db_oop1922.rsp
+    register: apply_dbru
+    failed_when: "'Successfully Setup Software' not in apply_dbru.stdout"
+
+  - debug:
+      msg: "Patching Succeeded by KKK DBA Team -  InsaneDBA was here..."
+    when: apply_dbru.rc in [6,0]

@@ -1,0 +1,9 @@
+---
+- hosts: dbservers
+  vars:
+    NEWDBHOME: /u01/app/oracle/product/19.22/dbhome_1
+  remote_user: root
+  tasks:
+
+  - name: execute root.sh 
+    action: shell export NEWDBHOME={{ NEWDBHOME}}; $NEWDBHOME/root.sh 
