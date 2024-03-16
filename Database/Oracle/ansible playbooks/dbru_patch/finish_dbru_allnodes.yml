@@ -37,7 +37,7 @@
       remote_src: yes
 
   - name: replace old_dbhome value in .bashrc files with the new_dbhome value 
-    action: shell sed -i 's@19.3/dbhome@19.22/dbhome_1@g' /root/.bashrc; sed -i 's@19.3/dbhome@19.22/dbhome_1@g' /home/oracle/.bashrc
+    action: shell sed -i 's@19.20/dbhome@19.22/dbhome_1@g' /root/.bashrc; sed -i 's@19.20/dbhome@19.22/dbhome_1@g' /home/oracle/.bashrc
     args:
       warn: false
 
