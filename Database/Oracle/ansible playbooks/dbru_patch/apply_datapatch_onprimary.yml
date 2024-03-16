@@ -1,0 +1,21 @@
+---
+- hosts: dbservers
+  vars:
+    NEWDBHOME: /u01/app/oracle/product/19.22/dbhome_1
+    DBROLE: PRIMARY
+  remote_user: oracle
+  tasks:
+
+  - name: register instances
+    action: shell ps -ef | grep  ora_pmon | grep -v grep | awk '{ print $NF }' | cut -c10-50
+    register: find_instances
+
+  - name: apply datapatch
+    action: shell export instname={{ item }}; export dbname=$(echo $instname |  awk '{print substr($1, 1, length($1)-1)}'); export inst_id=$(echo $instname |  awk '{print substr($1,length($1),1)}'); export dbrole=$(srvctl config database -d $dbname | grep "Database role" | awk '{ print $NF }'); if [ "$inst_id" == 1 ] && [ "$dbrole" == {{ DBROLE }} ] ; then export ORACLE_HOME={{ NEWDBHOME }}; export ORACLE_SID=$instname; $ORACLE_HOME/OPatch/datapatch -verbose; fi;
+    register: datapatch_candidates
+    with_items: "{{ find_instances.stdout_lines }}"
+    failed_when: "'SQL Patching tool complete' not in datapatch_candidates.stdout"
+
+  - debug:
+      var: item.stdout
+    with_items: "{{ datapatch_candidates['results'] }}"
