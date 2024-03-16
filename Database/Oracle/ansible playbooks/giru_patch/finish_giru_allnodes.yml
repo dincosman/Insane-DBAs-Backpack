@@ -38,6 +38,6 @@
       remote_src: yes
 
   - name: replace old_gridhome value in .bashrc files with the new_gridhome value
-    action: shell sed -i 's@19.22/grid@19.231/grid@g' /root/.bashrc; sed -i 's@19.22/grid@19.231/grid@g' /home/oracle/.bashrc
+    action: shell sed -i 's@19.20/grid@19.22/grid@g' /root/.bashrc; sed -i 's@19.20/grid@19.22/grid@g' /home/oracle/.bashrc
     args:
       warn: false
