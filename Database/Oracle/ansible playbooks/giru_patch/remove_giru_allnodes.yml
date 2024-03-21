@@ -1,53 +1,60 @@
 ---
-- hosts: dbservers
+- name: Deinstall Oracle Grid Infrastructure
+  hosts: dbservers
+  remote_user: root
   vars:
     removed_value: REMOVED="T"/>
-    OLDGRIDHOME: /u01/app/19.20/grid
+    old_grid_home: /u01/app/19.20/grid
     patch_dir: /u01/app/Setup
     ansible_python_interpreter: /usr/bin/python3
-  remote_user: root
+
   tasks:
+    - name: Create response file for silent deinstallation
+      ansible.builtin.shell:
+        cmd: "{{ old_grid_home }}/deinstall/deinstall -checkonly"
+      become: yes
+      become_user: oracle
+      become_method: su
+      throttle: 1
 
-  - name: create response file for silent deinstall
-    action: shell export OLDGRIDHOME={{ OLDGRIDHOME}}; $OLDGRIDHOME/deinstall/deinstall -checkonly
-    become: yes
-    become_user: oracle
-    become_method: su
-    throttle: 1
+    - name: Register old grid_home response file for deinstallation
+      ansible.builtin.shell:
+        cmd: "ls -lsrt /tmp/deinstall*/response/*.rsp | tail -1 | awk '{print $NF}'"
+      register: oldgridresponse
 
-  - name: register old grid_home responsefile for deinstall
-    action:  shell echo $(ls -lsrt /tmp/deinstall*/response/*.rsp  |tail -1 | awk '{print $NF}')
-    register: oldgridresponse
+    - name: Unlock old grid_home for deinstallation
+      ansible.builtin.shell:
+        cmd: "{{ old_grid_home }}/crs/install/rootcrs.sh -unlock -crshome {{ old_grid_home }} -paramfile {{ oldgridresponse.stdout }}"
+      become: yes
+      become_user: oracle
 
-  - name: unlock old grid_home for deinstall
-    action:  shell export OLDGRIDHOME={{ OLDGRIDHOME }};  $OLDGRIDHOME/crs/install/rootcrs.sh -unlock -crshome $OLDGRIDHOME -paramfile {{ oldgridresponse.stdout }}
+    - name: Recursively change ownership of old_grid_home directory
+      ansible.builtin.file:
+        path: "{{ old_grid_home | dirname }}"
+        state: directory
+        recurse: yes
+        owner: oracle
+        group: oinstall
 
-  - name: Recursively change ownership of old_grid_home directory
-    ansible.builtin.file:
-      path: "$(dirname {{ OLDGRIDHOME }})"
-      state: directory
-      recurse: yes
-      owner: oracle
-      group: oinstall
+    - name: Deinstall old grid_home
+      ansible.builtin.expect:
+        command: "/bin/bash -c '{{ old_grid_home }}/deinstall/deinstall'"
+        responses:
+          'Do you want to continue': 'y'
+        echo: yes
+        timeout: 600
+      become: yes
+      become_user: oracle
+      run_once: true
+      register: deinstall_result
 
-  - name: deinstall oldgridhome
-    become: yes
-    become_user: oracle
-    become_method: su
-    ansible.builtin.expect:
-      command: /bin/bash -c {{ OLDGRIDHOME }}/deinstall/deinstall
-      responses:
-        'Do you want to continue': 'y'
-      echo: yes
-      timeout: 600
-    throttle: 1
-    run_once: true
-    register: deinstall_result
+    - name: Check inventory whether old_grid_home is tagged with removed flag
+      ansible.builtin.shell:
+        cmd: "grep '{{ old_grid_home }}' /u01/app/oraInventory/ContentsXML/inventory.xml | awk '{ print $NF }'"
+      register: removedflag
 
-  - name: check inventory whether old_gridhome is tagged with removed flag
-    action:  shell echo $(grep "{{ OLDGRIDHOME }}" /u01/app/oraInventory/ContentsXML/inventory.xml | awk '{ print $NF }')
-    register: removedflag
-
-  - name: remove old grid_home directory
-    action:  shell export OLDGRIDHOME={{ OLDGRIDHOME}}; rm -rf "$(dirname "$OLDGRIDHOME")"
-    when: deinstall_result.rc == 0 or removedflag.stdout ==  removed_value 
+    - name: Remove old grid_home directory
+      ansible.builtin.file:
+        path: "{{ old_grid_home | dirname }}"
+        state: absent
+      when: deinstall_result.rc == 0 or removedflag.stdout == removed_value

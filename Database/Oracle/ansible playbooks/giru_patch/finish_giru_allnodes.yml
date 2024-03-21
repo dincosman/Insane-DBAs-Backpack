@@ -1,43 +1,64 @@
 ---
-- hosts: dbservers
+- name: Finish Oracle Grid Infrastructure Release Update
+  hosts: all
+  remote_user: root
+
   vars:
     crs_value: CRS="true"/>
-    NEWGRIDHOME: /u01/app/19.22/grid
-    OLDGRIDHOME: /u01/app/19.20/grid
+    new_grid_home: /u01/app/19.22/grid
+    old_grid_home: /u01/app/19.20/grid
     patch_dir: /u01/app/Setup
-  remote_user: root
+
   tasks:
+    - name: Register cluster nodes for response file
+      ansible.builtin.shell: "{{ old_grid_home }}/bin/olsnodes | tr '\n' ',' | sed 's/,$//'"
+      register: cluster_nodes
 
-  - name: register cluster nodes for responsefile
-    action:  shell echo $( {{ OLDGRIDHOME }}/bin/olsnodes | tr '\n' ',' | sed 's/,\s*$//')
-    register: cluster_nodes
+    - name: Tag the new grid home in inventory
+      ansible.builtin.command: >
+        $NEWGRIDHOME/gridSetup.sh -silent \
+        -switchGridHome oracle.install.option=CRS_SWONLY \
+        ORACLE_HOME={{ new_grid_home }} \
+        oracle.install.crs.config.clusterNodes={{ cluster_nodes.stdout }} \
+        oracle.install.crs.rootconfig.executeRootScript=false
+      become: yes
+      become_user: oracle
+      environment:
+        NEWGRIDHOME: "{{ new_grid_home }}"
 
-  - name: tag the new grid_home in inventory
-    action: shell export NEWGRIDHOME={{ NEWGRIDHOME}}; $NEWGRIDHOME/gridSetup.sh -silent -switchGridHome oracle.install.option=CRS_SWONLY ORACLE_HOME={{ NEWGRIDHOME}} oracle.install.crs.config.clusterNodes={{ cluster_nodes.stdout }} oracle.install.crs.rootconfig.executeRootScript=false
-    become: yes
-    become_user: oracle
-    
-  - name: check crs flag in inventory
-    action: shell grep {{ NEWGRIDHOME }} /u01/app/oraInventory/ContentsXML/inventory.xml | grep CRS | awk 'END { print $6 }'
-    register: crsflag
-    failed_when: crsflag.stdout !=  crs_value
+    - name: Check CRS flag in inventory
+      ansible.builtin.shell: |
+        grep "{{ new_grid_home }}" /u01/app/oraInventory/ContentsXML/inventory.xml |
+        grep CRS |
+        awk 'END { print $6 }'
+      register: crsflag
+      failed_when: crsflag.stdout != crs_value
 
-  - name: execute root.sh and start grid from new home
-    action: shell export NEWGRIDHOME={{ NEWGRIDHOME}}; $NEWGRIDHOME/root.sh
-    throttle: 1
+    - name: Execute root.sh and start grid from new home
+      ansible.builtin.shell: $NEWGRIDHOME/root.sh
+      environment:
+        NEWGRIDHOME: "{{ new_grid_home }}"
+      throttle: 1 
 
-  - name: remove response file from stage directory
-    file: path={{ patch_dir }}/grid_oop1922.rsp state=absent
+    - name: Remove response file from stage directory
+      ansible.builtin.file:
+        path: "{{ patch_dir }}/grid_oop1922.rsp"
+        state: absent
 
-  - name: Copy old grid home dependent files to the new grid home
-    copy:
-      src: "{{ OLDGRIDHOME }}/sqlplus/admin/glogin.sql"
-      dest: "{{ NEWGRIDHOME }}/sqlplus/admin/"
-      owner: oracle
-      group: oinstall
-      remote_src: yes
+    - name: Copy old grid home dependent files to the new grid home
+      ansible.builtin.copy:
+        src: "{{ old_grid_home }}/sqlplus/admin/glogin.sql"
+        dest: "{{ new_grid_home }}/sqlplus/admin/"
+        owner: oracle
+        group: oinstall
+        remote_src: yes
 
-  - name: replace old_gridhome value in .bashrc files with the new_gridhome value
-    action: shell sed -i 's@19.20/grid@19.22/grid@g' /root/.bashrc; sed -i 's@19.20/grid@19.22/grid@g' /home/oracle/.bashrc
-    args:
-      warn: false
+    - name: Replace old_grid_home value in .bashrc files with the new_gridhome value
+      ansible.builtin.replace:
+        path: "{{ item }}"
+        regexp: "{{ old_grid_home }}"
+        replace: "{{ new_grid_home }}"
+      loop:
+        - /root/.bashrc
+        - /home/oracle/.bashrc
+      
