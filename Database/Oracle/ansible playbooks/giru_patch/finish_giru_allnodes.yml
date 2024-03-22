@@ -17,7 +17,7 @@
 
     - name: Tag the new grid home in inventory
       ansible.builtin.shell:
-        cmd: >
+        cmd: |
           $NEWGRIDHOME/gridSetup.sh -silent \
           -switchGridHome oracle.install.option=CRS_SWONLY \
           ORACLE_HOME={{ new_grid_home }} \
@@ -30,7 +30,7 @@
 
     - name: Check CRS flag in inventory
       ansible.builtin.shell:
-        cmd: >
+        cmd: |
           grep "{{ new_grid_home }}" /u01/app/oraInventory/ContentsXML/inventory.xml |
           grep CRS |
           awk 'END { print $6 }' 
