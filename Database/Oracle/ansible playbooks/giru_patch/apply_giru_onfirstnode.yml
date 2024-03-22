@@ -107,7 +107,7 @@
 
     - name: Apply GIRU and oneoffs
       ansible.builtin.shell:
-        cmd: >
+        cmd: |
           {{ new_grid_home }}/gridSetup.sh -silent \
           -ignorePrereqFailure -waitforcompletion \
           -applyRU {{ patch_dir }}/GIRU/35940989 \
