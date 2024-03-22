@@ -1,21 +1,34 @@
----
-- hosts: dbservers
+- name: Apply Data Patch on First Nodes of Primary Databases
+  hosts: all
   vars:
-    NEWDBHOME: /u01/app/oracle/product/19.22/dbhome_1
-    DBROLE: PRIMARY
+    new_db_home: /u01/app/oracle/product/19.22/dbhome_1
+    db_role: PRIMARY
   remote_user: oracle
+  run_once: true
+
   tasks:
+    - name: Register instances
+      ansible.builtin.shell:
+        cmd: ps -ef | grep ora_pmon | grep -v grep | awk '{ print $NF }' | cut -c10-50
+      register: find_instances
 
-  - name: register instances
-    action: shell ps -ef | grep  ora_pmon | grep -v grep | awk '{ print $NF }' | cut -c10-50
-    register: find_instances
-
-  - name: apply datapatch
-    action: shell export instname={{ item }}; export dbname=$(echo $instname |  awk '{print substr($1, 1, length($1)-1)}'); export inst_id=$(echo $instname |  awk '{print substr($1,length($1),1)}'); export dbrole=$(srvctl config database -d $dbname | grep "Database role" | awk '{ print $NF }'); if [ "$inst_id" == 1 ] && [ "$dbrole" == {{ DBROLE }} ] ; then export ORACLE_HOME={{ NEWDBHOME }}; export ORACLE_SID=$instname; $ORACLE_HOME/OPatch/datapatch -verbose; fi;
-    register: datapatch_candidates
-    with_items: "{{ find_instances.stdout_lines }}"
-    failed_when: "'SQL Patching tool complete' not in datapatch_candidates.stdout"
-
-  - debug:
-      var: item.stdout
-    with_items: "{{ datapatch_candidates['results'] }}"
+    - name: Apply datapatch
+      ansible.builtin.shell:
+        cmd: |
+          export instname={{ item }}
+          export dbname=$(echo $instname |  awk '{print substr($1, 1, length($1)-1)}')
+          export inst_id=$(echo $instname |  awk '{print substr($1,length($1),1)}')
+          export dbrole=$(srvctl config database -d $dbname | grep "Database role" | awk '{ print $NF }')
+          if [ "$inst_id" == 1 ] && [ "$dbrole" == "{{ db_role }}" ]; then
+            export ORACLE_HOME={{ new_db_home }}
+            export ORACLE_SID=$instname
+            $ORACLE_HOME/OPatch/datapatch -verbose
+          fi
+      register: datapatch_candidates
+      loop: "{{ find_instances.stdout_lines }}"
+      throttle: 1
+      
+    - name: Debug datapatch output
+      ansible.builtin.debug:
+        var: item.stdout
+      loop: "{{ datapatch_candidates.results }}"

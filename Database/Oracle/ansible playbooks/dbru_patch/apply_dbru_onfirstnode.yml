@@ -1,103 +1,122 @@
 ---
-- hosts: dbservers
+- name: Apply Oracle Database Release Update
+  hosts: all
   vars:
     u01_size_mb: 11045
-    NEWDBHOME: /u01/app/oracle/product/19.22/dbhome_1
-    OLDDBHOME: /u01/app/oracle/product/19.20/dbhome_1
-    GRIDHOME: /u01/app/19.241/grid
+    new_db_home: /u01/app/oracle/product/19.22/dbhome_1
+    old_db_home: /u01/app/oracle/product/19.20/dbhome_1
+    grid_home: /u01/app/19.22/grid
     patch_dir: /u01/app/Setup
   remote_user: oracle
   tasks:
+    - name: Unzip new DB_HOME
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/LINUX.X64_193000_db_home.zip"
+        dest: "{{ new_db_home }}"
+        remote_src: yes
 
-  - name: unzip new db_home
-    action: shell unzip -oq {{ patch_dir }}/LINUX.X64_193000_db_home.zip -d {{ NEWDBHOME}}
-    args:
-      warn: false
+    - name: Unzip OPatch to new DB_HOME
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p6880880_122010_Linux-x86-64.zip"
+        dest: "{{ new_db_home }}"
+        remote_src: yes
 
-  - name: unzip OPatch to new db_home
-    action: shell unzip -oq {{ patch_dir }}/p6880880_122010_Linux-x86-64.zip -d {{ NEWDBHOME }}
-    args:
-      warn: false    
+    - name: Prepare sub-patches directory
+      ansible.builtin.file:
+        path: "{{ patch_dir }}/OJVM"
+        state: directory
+        owner: oracle
+        group: oinstall
 
-  - name: prepare_sub_patches
-    action: file dest={{ patch_dir }}/OJVM state=directory owner=oracle group=oinstall
+    - name: Unzip OJVM patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p35926646_190000_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/OJVM"
+        remote_src: yes
 
-  - name: unzip OJVM patch
-    action:  shell unzip -oq {{ patch_dir }}/p35926646_190000_Linux-x86-64.zip -d {{ patch_dir }}/OJVM
-    args:
-      warn: false
+    - name: Register cluster nodes for response file
+      ansible.builtin.shell: 
+        cmd: "{{ grid_home }}/bin/olsnodes | tr '\n' ',' | sed 's/,$//'"
+      register: cluster_nodes
 
-  - name: register cluster nodes for responsefile
-    action:  shell echo $({{ GRIDHOME }}/bin/olsnodes | tr '\n' ',' | sed 's/,\s*$//')
-    register: cluster_nodes
- 
-  - name: register osdba value for responsefile
-    action:  shell grep "OSDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
-    register: osdba
+    - name: Register osdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osdba
 
-  - name: register osoper value for responsefile
-    action:  shell grep "OSOPER_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
-    register: osoper
+    - name: Register osoper value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSOPER_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osoper
 
-  - name: register osbackupdba value for responsefile
-    action:  shell grep "OSBACKUPDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
-    register: osbackupdba
+    - name: Register osbackupdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSBACKUPDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osbackupdba
 
-  - name: register osdgdba value for responsefile
-    action:  shell grep "OSDGDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
-    register: osdgdba
+    - name: Register osdgdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSDGDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osdgdba
 
-  - name: register oskmdba value for responsefile
-    action:  shell grep "OSKMDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
-    register: oskmdba
+    - name: Register oskmdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSKMDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: oskmdba
 
-  - name: register osracdba value for responsefile
-    action:  shell grep "OSRACDBA_GROUP=" {{ OLDDBHOME }}/install/response/db_20*.rsp
-    register: osracdba
+    - name: Register osracdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSRACDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osracdba
 
-  - name: create contents of responsefile
-    copy:
-      dest: "{{ patch_dir }}/db_oop1922.rsp"
-      content: |
-        oracle.install.responseFileVersion=/oracle/install/rspfmt_dbinstall_response_schema_v19.0.0
-        oracle.install.option=INSTALL_DB_SWONLY 
-        UNIX_GROUP_NAME=oinstall 
-        INVENTORY_LOCATION=/u01/app/oraInventory 
-        ORACLE_BASE=/u01/app/oracle 
-        ORACLE_HOME={{ NEWDBHOME }}
-        oracle.install.db.InstallEdition=EE 
-        {{ osdba.stdout }}
-        {{ osoper.stdout }}
-        {{ osbackupdba.stdout }}
-        {{ osdgdba.stdout }}
-        {{ oskmdba.stdout }}
-        {{ osracdba.stdout }}
-        oracle.install.db.CLUSTER_NODES={{ cluster_nodes.stdout }}
-        SECURITY_UPDATES_VIA_MYORACLESUPPORT=false 
-        DECLINE_SECURITY_UPDATES=true
+    - name: Create contents of response file
+      ansible.builtin.copy:
+        dest: "{{ patch_dir }}/db_oop1922.rsp"
+        content: |
+          oracle.install.responseFileVersion=/oracle/install/rspfmt_dbinstall_response_schema_v19.0.0
+          oracle.install.option=INSTALL_DB_SWONLY
+          UNIX_GROUP_NAME=oinstall
+          INVENTORY_LOCATION=/u01/app/oraInventory
+          ORACLE_BASE=/u01/app/oracle
+          ORACLE_HOME={{ new_db_home }}
+          oracle.install.db.InstallEdition=EE
+          {{ osdba.stdout }}
+          {{ osoper.stdout }}
+          {{ osbackupdba.stdout }}
+          {{ osdgdba.stdout }}
+          {{ oskmdba.stdout }}
+          {{ osracdba.stdout }}
+          oracle.install.db.CLUSTER_NODES={{ cluster_nodes.stdout }}
+          SECURITY_UPDATES_VIA_MYORACLESUPPORT=false
+          DECLINE_SECURITY_UPDATES=true
 
-  - name: clean up dbhome zip files
-    file: path={{ patch_dir }}/LINUX.X64_193000_db_home.zip state=absent
+    - name: Clean up DB home zip files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ patch_dir }}/LINUX.X64_193000_db_home.zip"
+        - "{{ patch_dir }}/p35926646_190000_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p34672698_1922000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p35940989_190000_Linux-x86-64.zip"
 
-  - name: clean up OJVM patch zip files
-    file: path={{ patch_dir }}/p35926646_190000_Linux-x86-64.zip state=absent
+    - name: Check u01 free disk space
+      ansible.builtin.shell:
+        cmd: "df -P /u01 | awk 'END { print $4 }'"
+      register: u01size
+      failed_when: u01size.stdout|int < u01_size_mb * 1024
 
-  - name: clean up oneoff patch zip files
-    file: path={{ patch_dir }}/p34672698_1922000DBRU_Linux-x86-64.zip state=absent
+    - name: Apply DBRU and one-offs
+      ansible.builtin.shell: |
+        {{ new_db_home }}/runInstaller -silent -ignorePrereqFailure -waitforcompletion \
+        -applyRU {{ patch_dir }}/GIRU/35940989 \
+        -applyOneOffs \
+        {{ patch_dir }}/OJVM/35926646,\
+        {{ patch_dir }}/GIRUOneoff/34672698 \
+        -responsefile {{ patch_dir }}/db_oop1922.rsp
+      environment:
+        CV_ASSUME_DISTID: OL7
+        NEWDBHOME: "{{ new_db_home }}"
+      register: apply_dbru
+      failed_when: "'Successfully Setup Software' not in apply_dbru.stdout"
 
-  - name: clean up GIRU patch zip files
-    file: path={{ patch_dir }}/p35940989_190000_Linux-x86-64.zip state=absent
-
-  - name: check u01 free disk space
-    action: shell df -P /u01 | awk 'END { print $4 }'
-    register: u01size
-    failed_when: u01size.stdout|int <  u01_size_mb  * 1024
-
-  - name: apply dbru and oneoffs
-    action: shell export CV_ASSUME_DISTID=OL7; export NEWDBHOME={{ NEWDBHOME}}; $NEWDBHOME/runInstaller -silent -ignorePrereqFailure -waitforcompletion -applyRU {{ patch_dir }}/GIRU/35940989  -applyOneOffs {{ patch_dir }}/OJVM/35926646,{{ patch_dir }}/GIRUOneoff/34672698 -responsefile {{ patch_dir }}/db_oop1922.rsp
-    register: apply_dbru
-    failed_when: "'Successfully Setup Software' not in apply_dbru.stdout"
-
-  - debug:
-      msg: "Patching Succeeded by KKK DBA Team -  InsaneDBA was here..."
-    when: apply_dbru.rc in [6,0]

@@ -1,9 +1,21 @@
 ---
-- hosts: dbservers
+- name: Run root.sh in the new Oracle database home
+  hosts: all
   vars:
-    NEWDBHOME: /u01/app/oracle/product/19.22/dbhome_1
+    new_db_home: /u01/app/oracle/product/19.22/dbhome_1
+    old_db_home: /u01/app/oracle/product/19.20/dbhome_1
   remote_user: root
   tasks:
+    - name: Execute root.sh
+      ansible.builtin.command:
+        cmd: "{{ new_db_home }}/root.sh"
+      throttle: 1
 
-  - name: execute root.sh 
-    action: shell export NEWDBHOME={{ NEWDBHOME}}; $NEWDBHOME/root.sh 
+    - name: Replace old_dbhome value in .bashrc files with the new_dbhome value
+      ansible.builtin.replace:
+        path: "{{ item }}"
+        regexp: "{{ old_db_home }}"
+        replace: "{{ new_db_home }}"
+      loop:
+        - /root/.bashrc
+        - /home/oracle/.bashrc
