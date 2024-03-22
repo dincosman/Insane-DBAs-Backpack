@@ -1,9 +1,9 @@
 ---
 - name: Start Database Recovery Process on Standby Databases
-  hosts: dbservers
+  hosts: all
   remote_user: oracle
   vars:
-    db_home: /u01/app/oracle/product/19.22/dbhome_1
+    db_home: /u01/app/oracle/product/19.20/dbhome_1
     recovery_script_dest_dir: /home/oracle
     recovery_script_dir: /etc/ansible/projects
     patch_dir: /u01/app/Setup
@@ -22,17 +22,18 @@
         group: oinstall
         mode: '750'
 
-    - name: Debug: List found instances
+    - name: Debug List found instances
       ansible.builtin.debug:
         msg: "Found database instance: {{ item }}"
       loop: "{{ find_instances.stdout_lines }}"
 
     - name: Start recovery
-      ansible.builtin.shell: "{{ recovery_script_dest_dir }}/start_recover_onremote.sh {{ item }} {{ db_home }}"
+      ansible.builtin.shell: 
+        cmd: "{{ recovery_script_dest_dir }}/start_recover_onremote.sh {{ item }} {{ db_home }}"
       loop: "{{ find_instances.stdout_lines }}"
       register: recovery_output
 
-    - name: Debug: Recovery output
+    - name: Debug Recovery output
       ansible.builtin.debug:
         var: item.stdout
       loop: "{{ recovery_output.results }}"

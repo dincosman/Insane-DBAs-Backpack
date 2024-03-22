@@ -38,7 +38,7 @@
         group: oinstall
       loop:
         - "{{ patch_dir }}/GIRU"
-        - "{{ patch_dir }}/GIRUOneoff"
+        - "{{ patch_dir }}/GIRUOneOff"
 
     - name: Unzip GIRU system patch
       ansible.builtin.unarchive:
@@ -49,7 +49,7 @@
     - name: Unzip GIRU oneoff patch
       ansible.builtin.unarchive:
         src: "{{ patch_dir }}/p34672698_1922000DBRU_Linux-x86-64.zip"
-        dest: "{{ patch_dir }}/GIRUOneoff"
+        dest: "{{ patch_dir }}/GIRUOneOff"
         remote_src: yes
 
     - name: Register cluster nodes for response file
@@ -74,7 +74,7 @@
 
     - name: Create contents of response file
       ansible.builtin.copy:
-        dest: "{{ patch_dir }}/grid_oop1922.rsp"
+        dest: "{{ patch_dir }}/grid_oop.rsp"
         content: |
           oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_schema_v19.0.0
           INVENTORY_LOCATION=/u01/app/oraInventory
@@ -97,6 +97,7 @@
       loop:
         - "{{ patch_dir }}/LINUX.X64_193000_grid_home.zip"
         - "{{ patch_dir }}/p35940989_190000_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p34672698_1922000DBRU_Linux-x86-64.zip"
 
     - name: Check u01 free disk space
       ansible.builtin.shell: 
@@ -105,12 +106,13 @@
       failed_when: u01size.stdout | int < u01_size_mb * 1024
 
     - name: Apply GIRU and oneoffs
-      ansible.builtin.command: >
-        {{ new_grid_home }}/gridSetup.sh -silent
-        -ignorePrereqFailure -waitforcompletion
-        -applyRU {{ patch_dir }}/GIRU/35940989
-        -applyOneOffs {{ patch_dir }}/GIRUOneoff/34672698
-        -responsefile {{ patch_dir }}/grid_oop1922.rsp
+      ansible.builtin.shell:
+        cmd: >
+          {{ new_grid_home }}/gridSetup.sh -silent \
+          -ignorePrereqFailure -waitforcompletion \
+          -applyRU {{ patch_dir }}/GIRU/35940989 \
+          -applyOneOffs {{ patch_dir }}/GIRUOneOff/34672698 \
+          -responsefile {{ patch_dir }}/grid_oop.rsp 
       environment:
         CV_ASSUME_DISTID: OL7
         NEWGRIDHOME: "{{ new_grid_home }}"
@@ -120,4 +122,4 @@
     - name: Output patching success message
       ansible.builtin.debug:
         msg: "Patching succeeded. InsaneDBA was here."
-      when: apply_giru.rc in [6, 0]                             
+      when: apply_giru.rc in [6,0]         

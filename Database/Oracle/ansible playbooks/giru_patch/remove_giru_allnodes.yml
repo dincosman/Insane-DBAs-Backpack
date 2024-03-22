@@ -1,6 +1,6 @@
 ---
 - name: Deinstall Oracle Grid Infrastructure
-  hosts: dbservers
+  hosts: all
   remote_user: root
   vars:
     removed_value: REMOVED="T"/>

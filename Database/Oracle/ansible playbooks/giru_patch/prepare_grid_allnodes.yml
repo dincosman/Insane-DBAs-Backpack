@@ -9,14 +9,14 @@
 
   tasks:
     - name: Ensure patch directory exists
-      file:
+      ansible.builtin.file:
         path: "{{ patch_dir }}"
         state: directory
         owner: oracle
         group: oinstall
 
     - name: Ensure new grid home directory exists
-      file:
+      ansible.builtin.file:
         path: "{{ new_grid_home }}"
         state: directory
         owner: oracle

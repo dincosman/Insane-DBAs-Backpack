@@ -11,38 +11,40 @@
 
   tasks:
     - name: Register cluster nodes for response file
-      ansible.builtin.shell: "{{ old_grid_home }}/bin/olsnodes | tr '\n' ',' | sed 's/,$//'"
+      ansible.builtin.shell: 
+        cmd: "{{ old_grid_home }}/bin/olsnodes | tr '\n' ',' | sed 's/,$//'"
       register: cluster_nodes
 
     - name: Tag the new grid home in inventory
-      ansible.builtin.command: >
-        $NEWGRIDHOME/gridSetup.sh -silent \
-        -switchGridHome oracle.install.option=CRS_SWONLY \
-        ORACLE_HOME={{ new_grid_home }} \
-        oracle.install.crs.config.clusterNodes={{ cluster_nodes.stdout }} \
-        oracle.install.crs.rootconfig.executeRootScript=false
+      ansible.builtin.shell:
+        cmd: >
+          $NEWGRIDHOME/gridSetup.sh -silent \
+          -switchGridHome oracle.install.option=CRS_SWONLY \
+          ORACLE_HOME={{ new_grid_home }} \
+          oracle.install.crs.config.clusterNodes={{ cluster_nodes.stdout }} \
+          oracle.install.crs.rootconfig.executeRootScript=false
       become: yes
       become_user: oracle
       environment:
         NEWGRIDHOME: "{{ new_grid_home }}"
 
     - name: Check CRS flag in inventory
-      ansible.builtin.shell: |
-        grep "{{ new_grid_home }}" /u01/app/oraInventory/ContentsXML/inventory.xml |
-        grep CRS |
-        awk 'END { print $6 }'
+      ansible.builtin.shell:
+        cmd: >
+          grep "{{ new_grid_home }}" /u01/app/oraInventory/ContentsXML/inventory.xml |
+          grep CRS |
+          awk 'END { print $6 }' 
       register: crsflag
       failed_when: crsflag.stdout != crs_value
 
     - name: Execute root.sh and start grid from new home
-      ansible.builtin.shell: $NEWGRIDHOME/root.sh
-      environment:
-        NEWGRIDHOME: "{{ new_grid_home }}"
+      ansible.builtin.command:
+        cmd: "{{ new_grid_home }}/root.sh"
       throttle: 1 
 
     - name: Remove response file from stage directory
       ansible.builtin.file:
-        path: "{{ patch_dir }}/grid_oop1922.rsp"
+        path: "{{ patch_dir }}/grid_oop.rsp"
         state: absent
 
     - name: Copy old grid home dependent files to the new grid home
