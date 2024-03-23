@@ -11,9 +11,9 @@
   tasks:
     - name: Remove response file from stage directory
       ansible.builtin.file:
-        path: "{{ patch_dir }}/db_oop1922.rsp"
+        path: "{{ patch_dir }}/db_oop.rsp"
         state: absent
-    
+
     - name: Copy old db home dependent network files to the new db home
       ansible.builtin.copy:
         src: "{{ old_db_home }}/network/admin/"
@@ -37,15 +37,6 @@
         owner: oracle
         group: oinstall
         remote_src: yes
-    
-    - name: Replace old_dbhome value in .bashrc files with the new_dbhome value
-      ansible.builtin.replace:
-        path: "{{ item }}"
-        regexp: "{{ old_db_home }}"
-        replace: "{{ new_db_home }}"
-      loop:
-        - /root/.bashrc
-        - /home/oracle/.bashrc
 
     - name: Relink unified auditing in new_dbhome
       ansible.builtin.command:
@@ -74,10 +65,23 @@
       ansible.builtin.shell:
         cmd: |
           export dbname=$(echo {{ item }} | awk '{print substr($1, 1, length($1)-1)}')
-          srvctl stop instance -d $dbname -i {{ item }} -f
+          srvctl stop instance -d $dbname -i {{ item }} -f 
           srvctl start instance -d $dbname -i {{ item }}
       loop: "{{ find_instances.stdout_lines }}"
       throttle: 1
+
+    - name: Remove patch setup folders from stage directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ patch_dir }}/GIRU"
+        - "{{ patch_dir }}/GIRUOneOff"
+        - "{{ patch_dir }}/OJVM"
+        - "{{ patch_dir }}/DBRUOneOff"
+        - "{{ patch_dir }}/Spatial"
+        - "{{ patch_dir }}/DPBP"
+        - "{{ patch_dir }}/GIMRP"
 
     - name: Copy start recovery file to remote server
       ansible.builtin.copy:
@@ -92,7 +96,8 @@
         cmd: "{{ recovery_script_dest_dir }}/start_recover_onremote.sh {{ item }} {{ new_db_home }}"
       loop: "{{ find_instances.stdout_lines }}"
       register: recovery_output
-    
-    - debug:
+
+    - name: Debug Recovery output
+      ansible.builtin.debug:
         var: item.stdout
-      loop: "{{ recovery_output.results }}"
+      loop: "{{ recovery_output.results }}" 

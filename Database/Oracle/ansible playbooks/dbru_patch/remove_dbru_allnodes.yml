@@ -36,11 +36,3 @@
         OLDDBHOME: "{{ old_db_home }}"
       when: deinstall_result.rc == 0 or removedflag.stdout == removed_value
 
-    - name: Remove cleanup folders from stage directory
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ patch_dir }}/GIRU"
-        - "{{ patch_dir }}/OJVM"
-      run_once: true

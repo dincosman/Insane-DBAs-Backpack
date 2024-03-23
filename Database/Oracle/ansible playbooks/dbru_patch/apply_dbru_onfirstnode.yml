@@ -8,6 +8,8 @@
     grid_home: /u01/app/19.22/grid
     patch_dir: /u01/app/Setup
   remote_user: oracle
+  run_once: true
+  
   tasks:
     - name: Unzip new DB_HOME
       ansible.builtin.unarchive:
@@ -21,17 +23,47 @@
         dest: "{{ new_db_home }}"
         remote_src: yes
 
-    - name: Prepare sub-patches directory
+    - name: Prepare patches directories
       ansible.builtin.file:
-        path: "{{ patch_dir }}/OJVM"
+        path: "{{ item }}"
         state: directory
         owner: oracle
         group: oinstall
+      loop:
+        - "{{ patch_dir }}/OJVM"
+        - "{{ patch_dir }}/GIMRP"
+        - "{{ patch_dir }}/Spatial"
+        - "{{ patch_dir }}/DPBP"
+        - "{{ patch_dir }}/DBRUOneOff"
 
     - name: Unzip OJVM patch
       ansible.builtin.unarchive:
         src: "{{ patch_dir }}/p35926646_190000_Linux-x86-64.zip"
         dest: "{{ patch_dir }}/OJVM"
+        remote_src: yes
+
+    - name: Unzip GIMRP patches
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p36356990_1922000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/GIMRP"
+        remote_src: yes
+
+    - name: Unzip Spatial patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p36374563_1922000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/Spatial"
+        remote_src: yes
+
+    - name: Unzip Data Pump Bundle Patch patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p36092868_1922000DBRU_Generic.zip"
+        dest: "{{ patch_dir }}/DPBP"
+        remote_src: yes
+
+    - name: Unzip oneoff patches
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p35778398_1922000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/DBRUOneOff"
         remote_src: yes
 
     - name: Register cluster nodes for response file
@@ -71,7 +103,7 @@
 
     - name: Create contents of response file
       ansible.builtin.copy:
-        dest: "{{ patch_dir }}/db_oop1922.rsp"
+        dest: "{{ patch_dir }}/db_oop.rsp"
         content: |
           oracle.install.responseFileVersion=/oracle/install/rspfmt_dbinstall_response_schema_v19.0.0
           oracle.install.option=INSTALL_DB_SWONLY
@@ -98,7 +130,12 @@
         - "{{ patch_dir }}/LINUX.X64_193000_db_home.zip"
         - "{{ patch_dir }}/p35926646_190000_Linux-x86-64.zip"
         - "{{ patch_dir }}/p34672698_1922000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p36356990_1922000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p36374563_1922000DBRU_Linux-x86-64.zip"
         - "{{ patch_dir }}/p35940989_190000_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p36092868_1922000DBRU_Generic.zip"
+        - "{{ patch_dir }}/p35778398_1922000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p6880880_122010_Linux-x86-64.zip"
 
     - name: Check u01 free disk space
       ansible.builtin.shell:
@@ -107,13 +144,26 @@
       failed_when: u01size.stdout|int < u01_size_mb * 1024
 
     - name: Apply DBRU and one-offs
-      ansible.builtin.shell: |
-        {{ new_db_home }}/runInstaller -silent -ignorePrereqFailure -waitforcompletion \
-        -applyRU {{ patch_dir }}/GIRU/35940989 \
-        -applyOneOffs \
-        {{ patch_dir }}/OJVM/35926646,\
-        {{ patch_dir }}/GIRUOneoff/34672698 \
-        -responsefile {{ patch_dir }}/db_oop1922.rsp
+      ansible.builtin.shell:
+        cmd: |
+          {{ new_db_home }}/runInstaller -silent -ignorePrereqFailure -waitforcompletion \
+          -applyRU {{ patch_dir }}/GIRU/35940989 \
+          -applyOneOffs \
+          {{ patch_dir }}/OJVM/35926646,\
+          {{ patch_dir }}/GIRUOneOff/34672698,\
+          {{ patch_dir }}/Spatial/36374563,\
+          {{ patch_dir }}/DPBP/36092868,\
+          {{ patch_dir }}/DBRUOneOff/35778398,\
+          {{ patch_dir }}/GIMRP/36356990/35692839,\
+          {{ patch_dir }}/GIMRP/36356990/35818242,\
+          {{ patch_dir }}/GIMRP/36356990/35985645,\
+          {{ patch_dir }}/GIMRP/36356990/35998116,\
+          {{ patch_dir }}/GIMRP/36356990/36102295,\
+          {{ patch_dir }}/GIMRP/36356990/36228325,\
+          {{ patch_dir }}/GIMRP/36356990/36230174,\
+          {{ patch_dir }}/GIMRP/36356990/36366069,\
+          {{ patch_dir }}/GIMRP/36356990/36386686 \
+          -responsefile {{ patch_dir }}/db_oop.rsp
       environment:
         CV_ASSUME_DISTID: OL7
         NEWDBHOME: "{{ new_db_home }}"

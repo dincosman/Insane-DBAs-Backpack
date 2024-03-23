@@ -1,3 +1,4 @@
+---
 - name: Apply Data Patch on First Nodes of Primary Databases
   hosts: all
   vars:
@@ -15,15 +16,15 @@
     - name: Apply datapatch
       ansible.builtin.shell:
         cmd: |
-          export instname={{ item }}
-          export dbname=$(echo $instname |  awk '{print substr($1, 1, length($1)-1)}')
-          export inst_id=$(echo $instname |  awk '{print substr($1,length($1),1)}')
-          export dbrole=$(srvctl config database -d $dbname | grep "Database role" | awk '{ print $NF }')
-          if [ "$inst_id" == 1 ] && [ "$dbrole" == "{{ db_role }}" ]; then
-            export ORACLE_HOME={{ new_db_home }}
-            export ORACLE_SID=$instname
-            $ORACLE_HOME/OPatch/datapatch -verbose
-          fi
+          export instname={{ item }} 
+          export dbname=$(echo $instname |  awk '{print substr($1, 1, length($1)-1)}') 
+          export inst_id=$(echo $instname |  awk '{print substr($1,length($1),1)}') 
+          export dbrole=$(srvctl config database -d $dbname | grep "Database role" | awk '{ print $NF }') 
+          if [ "$inst_id" == 1 ] && [ "$dbrole" == "{{ db_role }}" ]; then 
+            export ORACLE_HOME={{ new_db_home }} 
+            export ORACLE_SID=$instname 
+            $ORACLE_HOME/OPatch/datapatch -verbose 
+          fi 
       register: datapatch_candidates
       loop: "{{ find_instances.stdout_lines }}"
       throttle: 1
