@@ -169,5 +169,5 @@
         NEWDBHOME: "{{ new_db_home }}"
       register: apply_dbru
       failed_when: "'Successfully Setup Software' not in apply_dbru.stdout"
-      async: 3600
+      async: 7200
       poll: 20
