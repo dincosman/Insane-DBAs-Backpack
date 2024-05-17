@@ -5,7 +5,7 @@ const fastimp = require("fast-csv");
 // Start timing
 const startTime = process.hrtime();
 
-// Mongodb connection string
+// Mongo API connection string
 let url = "mongodb://postgres:postgres@192.168.1.31:27002/ferretdb?authMechanism=PLAIN";
 let stream = fs.createReadStream("measurements.txt");
 let statData = [];
