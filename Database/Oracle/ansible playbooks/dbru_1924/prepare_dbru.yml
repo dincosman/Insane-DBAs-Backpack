@@ -1,0 +1,22 @@
+- name: Configure New Oracle Database Homes
+  hosts: all
+  remote_user: oracle
+
+  vars:
+    new_db_home: /u01/app/oracle/product/19.24/dbhome_1
+    patch_dir: /u01/app/Setup
+
+  tasks:
+    - name: Prepare patch directory for setup files
+      ansible.builtin.file:
+        path: "{{ patch_dir }}"
+        state: directory
+        owner: oracle
+        group: oinstall
+
+    - name: Prepare new database home
+      ansible.builtin.file:
+        path: "{{ new_db_home }}"
+        state: directory
+        owner: oracle
+        group: oinstall

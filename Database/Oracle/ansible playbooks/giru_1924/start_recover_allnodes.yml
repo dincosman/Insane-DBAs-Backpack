@@ -1,0 +1,36 @@
+- name: Start Database Recovery Process on Standby Databases
+  hosts: dbservers
+  remote_user: oracle
+  vars:
+    db_home: /u01/app/oracle/product/19.22/dbhome_1
+    recovery_script_dest_dir: /home/oracle
+    recovery_script_dir: /etc/ansible/projects
+    patch_dir: /u01/app/Setup
+
+  tasks:
+    - name: Register instances
+      ansible.builtin.shell: "ps -ef | grep ora_pmon | grep -v grep | awk '{ print $NF }' | cut -c10-50"
+      register: find_instances
+
+    - name: Copy start recovery file to remote server
+      ansible.builtin.copy:
+        src: "{{ recovery_script_dir }}/start_recover_onremote.sh"
+        dest: "{{ recovery_script_dest_dir }}"
+        owner: oracle
+        group: oinstall
+        mode: '0750'
+
+    - name: Debug List found instances
+      ansible.builtin.debug:
+        msg: "Found database instance: {{ item }}"
+      loop: "{{ find_instances.stdout_lines }}"
+
+    - name: Start recovery
+      ansible.builtin.shell: "{{ recovery_script_dest_dir }}/start_recover_onremote.sh {{ item }} {{ db_home }}"
+      loop: "{{ find_instances.stdout_lines }}"
+      register: recovery_output
+
+    - name: Debug Recovery output
+      ansible.builtin.debug:
+        var: item.stdout
+      loop: "{{ recovery_output.results }}"
