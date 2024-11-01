@@ -1,0 +1,14 @@
+- name: Import playbook to prepare new Oracle Grid Infrastructure Home
+  ansible.builtin.import_playbook: prepare_grid_allnodes.yml
+
+- name: Import playbook to apply Oracle Grid Infrastructure Release Update
+  ansible.builtin.import_playbook: apply_giru_onfirstnode.yml
+
+- name: Import playbook to finish Oracle Grid Infrastructure Release Update
+  ansible.builtin.import_playbook: finish_giru_allnodes.yml
+
+- name: Import playbook to start Database Recovery Process on Standby Databases
+  ansible.builtin.import_playbook: start_recover_allnodes.yml
+
+- name: Import playbook to remove old grid home
+  ansible.builtin.import_playbook: remove_giru_allnodes.yml
