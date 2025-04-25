@@ -1,0 +1,64 @@
+- name: Finish Oracle Grid Infrastructure Release Update
+  hosts: dbservers
+  remote_user: root
+
+  vars:
+    crs_value: CRS="true"/>
+    new_grid_home: /u01/app/19.26/grid
+    old_grid_home: /u01/app/19.24/grid
+    patch_dir: /u01/app/Setup
+
+  tasks:
+    - name: Register cluster nodes for response file
+      ansible.builtin.shell:
+        cmd: "{{ old_grid_home }}/bin/olsnodes | tr '\n' ',' | sed 's/,$//'"
+      register: cluster_nodes
+
+    - name: Tag the new grid home in inventory
+      ansible.builtin.shell:
+        cmd: |
+          $NEWGRIDHOME/gridSetup.sh -silent \
+          -switchGridHome oracle.install.option=CRS_SWONLY \
+          ORACLE_HOME={{ new_grid_home }} \
+          oracle.install.crs.config.clusterNodes={{ cluster_nodes.stdout }} \
+          oracle.install.crs.rootconfig.executeRootScript=false
+      become: yes
+      become_user: oracle
+      environment:
+        NEWGRIDHOME: "{{ new_grid_home }}"
+
+    - name: Check CRS flag in inventory
+      ansible.builtin.shell:
+        cmd: |
+          grep "{{ new_grid_home }}" /u01/app/oraInventory/ContentsXML/inventory.xml |
+          grep CRS |
+          awk 'END { print $6 }'
+      register: crsflag
+      failed_when: crsflag.stdout != crs_value
+
+    - name: Execute root.sh and start grid from new home
+      ansible.builtin.command:
+        cmd: "{{ new_grid_home }}/root.sh"
+      throttle: 1
+
+    - name: Remove response file from stage directory
+      ansible.builtin.file:
+        path: "{{ patch_dir }}/grid_oop.rsp"
+        state: absent
+
+    - name: Copy old grid home dependent files to the new grid home
+      ansible.builtin.copy:
+        src: "{{ old_grid_home }}/sqlplus/admin/glogin.sql"
+        dest: "{{ new_grid_home }}/sqlplus/admin/"
+        owner: oracle
+        group: oinstall
+        remote_src: yes
+
+    - name: Replace old_grid_home value in .bashrc files with the new_gridhome value
+      ansible.builtin.replace:
+        path: "{{ item }}"
+        regexp: "{{ old_grid_home }}"
+        replace: "{{ new_grid_home }}"
+      loop:
+        - /root/.bashrc
+        - /home/oracle/.bashrc
