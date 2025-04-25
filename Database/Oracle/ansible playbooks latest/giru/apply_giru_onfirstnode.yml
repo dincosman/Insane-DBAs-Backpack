@@ -1,0 +1,148 @@
+- name: Apply Oracle Grid Infrastructure Release Update
+  hosts: dbservers
+  remote_user: oracle
+  run_once: true
+  vars:
+    u01_size_mb: 13356
+    new_grid_home: /u01/app/19.26/grid
+    old_grid_home: /u01/app/19.24/grid
+    patch_dir: /u01/app/Setup
+    source_patch_dir: /u01/app/Setup
+
+  tasks:
+    - name: Copy setup files to target server
+      ansible.builtin.copy:
+        src: "{{ source_patch_dir }}/"
+        dest: "{{ patch_dir }}/"
+        owner: oracle
+        group: oinstall
+
+    - name: Unzip new grid home
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/LINUX.X64_193000_grid_home.zip"
+        dest: "{{ new_grid_home }}"
+        remote_src: yes
+
+    - name: Unzip OPatch to new grid home
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p6880880_122010_Linux-x86-64.zip"
+        dest: "{{ new_grid_home }}"
+        remote_src: yes
+
+    - name: Prepare patches directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: oracle
+        group: oinstall
+      loop:
+        - "{{ patch_dir }}/GIRU"
+        - "{{ patch_dir }}/GIRUOneOff"
+        - "{{ patch_dir }}/GIMRP"
+
+    - name: Unzip GIRU system patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p37257886_190000_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/GIRU"
+        remote_src: yes
+
+    - name: Unzip GIMRP patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p37769929_1926000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/GIMRP"
+        remote_src: yes
+
+    - name: Unzip GIRU oneoff patch ORA-800
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p34672698_1926000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/GIRUOneOff"
+        remote_src: yes
+
+    - name: Unzip GIRU oneoff patch Resync Hanging
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p37669540_1926000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/GIRUOneOff"
+        remote_src: yes
+
+    - name: Register cluster nodes for response file
+      ansible.builtin.shell: 
+        cmd: "{{ old_grid_home }}/bin/olsnodes | tr '\n' ',' | sed 's/,$//'"
+      register: cluster_nodes
+
+    - name: Register OSDBA value for response file
+      ansible.builtin.shell: 
+        cmd: "grep 'OSDBA=' {{ old_grid_home }}/install/response/grid_20*.rsp"
+      register: osdba
+
+    - name: Register OSOPER value for response file
+      ansible.builtin.shell: 
+        cmd: "grep 'OSOPER=' {{ old_grid_home }}/install/response/grid_20*.rsp"
+      register: osoper
+
+    - name: Register OSASM value for response file
+      ansible.builtin.shell: 
+        cmd: "grep 'OSASM=' {{ old_grid_home }}/install/response/grid_20*.rsp"
+      register: osasm
+
+    - name: Create contents of response file
+      ansible.builtin.copy:
+        dest: "{{ patch_dir }}/grid_oop.rsp"
+        content: |
+          oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_schema_v19.0.0
+          INVENTORY_LOCATION=/u01/app/oraInventory
+          oracle.install.option=CRS_SWONLY
+          ORACLE_BASE=/u01/app/oracle
+          {{ osdba.stdout }}
+          {{ osoper.stdout }}
+          {{ osasm.stdout }}
+          oracle.install.crs.config.clusterNodes={{ cluster_nodes.stdout }}
+          ORACLE_HOME={{ new_grid_home }}  
+          oracle.install.crs.config.ClusterConfiguration=STANDALONE
+          oracle.install.crs.config.configureAsExtendedCluster=false
+          oracle.install.crs.config.gpnp.configureGNS=false
+          oracle.install.crs.config.autoConfigureClusterNodeVIP=false
+
+    - name: Clean up grid_home setup zip files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ patch_dir }}/LINUX.X64_193000_grid_home.zip"
+        - "{{ patch_dir }}/p34672698_1926000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p37257886_190000_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p37769929_1926000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p37669540_1926000DBRU_Linux-x86-64.zip"
+
+    - name: Check u01 free disk space
+      ansible.builtin.shell: 
+        cmd: "df -P /u01 | awk 'END { print $4 }'"
+      register: u01size
+      failed_when: u01size.stdout | int < u01_size_mb * 1024
+
+    - name: Apply GIRU and oneoffs
+      ansible.builtin.shell:
+        cmd: |
+          {{ new_grid_home }}/gridSetup.sh -silent \
+          -ignorePrereqFailure -waitforcompletion \
+          -applyRU {{ patch_dir }}/GIRU/37257886 \
+          -applyOneOffs {{ patch_dir }}/GIMRP/37769929/36124707,{{ patch_dir }}/GIMRP/37769929/36534155,{{ patch_dir }}/GIMRP/37769929/36813092,{{ patch_dir }}/GIMRP/37769929/37421153,{{ patch_dir }}/GIMRP/37769929/37694630,{{ patch_dir }}/GIMRP/37769929/37792660,{{ patch_dir }}/GIRUOneOff/34672698,{{ patch_dir }}/GIRUOneOff/37669540 \
+          -responsefile {{ patch_dir }}/grid_oop.rsp 
+      environment:
+        CV_ASSUME_DISTID: OL7
+        NEWGRIDHOME: "{{ new_grid_home }}"
+      register: apply_giru
+      failed_when: "'Successfully Setup Software' not in apply_giru.stdout"
+
+    - name: Clean up grid_home setup and patch files directory and contents
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ patch_dir }}/GIRU"
+        - "{{ patch_dir }}/GIRUOneOff"
+        - "{{ patch_dir }}/GIMRP"
+
+    - name: Output patching success message
+      ansible.builtin.debug:
+        msg: "Patching succeeded. InsaneDBA was here."
+      when: apply_giru.rc in [6,0]
