@@ -1,0 +1,184 @@
+- name: Apply Oracle Database Release Update
+  hosts: allhosts
+  vars:
+    u01_size_mb: 13356
+    new_db_home: /u01/app/oracle/product/19.28/dbhome_1
+    old_db_home: /u01/app/oracle/product/19.26/dbhome_1
+    grid_home: /u01/app/19.28/grid
+    patch_dir: /u01/app/Setup
+    source_patch_dir: /u01/app/Setup
+  remote_user: oracle
+  run_once: true
+  
+  tasks:
+    - name: Copy setup files to target server
+      ansible.builtin.copy:
+        src: "{{ source_patch_dir }}/"
+        dest: "{{ patch_dir }}/"
+        owner: oracle
+        group: oinstall
+        
+    - name: Unzip new DB_HOME
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/LINUX.X64_193000_db_home.zip"
+        dest: "{{ new_db_home }}"
+        remote_src: yes
+
+    - name: Unzip OPatch to new DB_HOME
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p6880880_190000_Linux-x86-64.zip"
+        dest: "{{ new_db_home }}"
+        remote_src: yes
+
+    - name: Prepare patches directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: oracle
+        group: oinstall
+      loop:
+        - "{{ patch_dir }}/GIRU"
+        - "{{ patch_dir }}/OJVM"
+        - "{{ patch_dir }}/DBRUOneOff"
+        - "{{ patch_dir }}/GIMRP"
+
+    - name: unzip GIRU system patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p37957391_190000_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/GIRU"
+        remote_src: yes
+
+    - name: Unzip OJVM patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p37847857_190000_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/OJVM"
+        remote_src: yes
+
+    - name: unzip GIMRP
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p38509394_1928000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/GIMRP"
+        remote_src: yes
+
+    - name: unzip DBRU oneoff patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p34672698_1928000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/DBRUOneOff"
+        remote_src: yes
+
+    - name: unzip Data Pump Bundle patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p38170982_1928000DBRU_Generic.zip"
+        dest: "{{ patch_dir }}/DBRUOneOff"
+        remote_src: yes
+
+    - name: unzip Spatial Bundle patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p38599552_1928000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/DBRUOneOff"
+        remote_src: yes
+        
+    - name: unzip Oracle text Bundle patch
+      ansible.builtin.unarchive:
+        src: "{{ patch_dir }}/p38219529_1928000DBRU_Linux-x86-64.zip"
+        dest: "{{ patch_dir }}/DBRUOneOff"
+        remote_src: yes
+        
+    - name: Register cluster nodes for response file
+      ansible.builtin.shell: 
+        cmd: "{{ grid_home }}/bin/olsnodes | tr '\n' ',' | sed 's/,$//'"
+      register: cluster_nodes
+
+    - name: Register osdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osdba
+
+    - name: Register osoper value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSOPER_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osoper
+
+    - name: Register osbackupdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSBACKUPDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osbackupdba
+
+    - name: Register osdgdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSDGDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osdgdba
+
+    - name: Register oskmdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSKMDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: oskmdba
+
+    - name: Register osracdba value for response file
+      ansible.builtin.shell:
+        cmd: "grep 'OSRACDBA_GROUP=' {{ old_db_home }}/install/response/db_20*.rsp"
+      register: osracdba
+
+    - name: Create contents of response file
+      ansible.builtin.copy:
+        dest: "{{ patch_dir }}/db_oop.rsp"
+        content: |
+          oracle.install.responseFileVersion=/oracle/install/rspfmt_dbinstall_response_schema_v19.0.0
+          oracle.install.option=INSTALL_DB_SWONLY
+          UNIX_GROUP_NAME=oinstall
+          INVENTORY_LOCATION=/u01/app/oraInventory
+          ORACLE_BASE=/u01/app/oracle
+          ORACLE_HOME={{ new_db_home }}
+          oracle.install.db.InstallEdition=EE
+          {{ osdba.stdout }}
+          {{ osoper.stdout }}
+          {{ osbackupdba.stdout }}
+          {{ osdgdba.stdout }}
+          {{ oskmdba.stdout }}
+          {{ osracdba.stdout }}
+          oracle.install.db.CLUSTER_NODES={{ cluster_nodes.stdout }}
+          SECURITY_UPDATES_VIA_MYORACLESUPPORT=false
+          DECLINE_SECURITY_UPDATES=true
+
+    - name: Clean up DB home zip files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ patch_dir }}/LINUX.X64_193000_db_home.zip"
+        - "{{ patch_dir }}/LINUX.X64_193000_grid_home.zip"
+        - "{{ patch_dir }}/p37957391_190000_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p37847857_190000_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p38509394_1928000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p34672698_1928000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p38170982_1928000DBRU_Generic.zip"
+        - "{{ patch_dir }}/p38599552_1928000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p38219529_1928000DBRU_Linux-x86-64.zip"
+        - "{{ patch_dir }}/p6880880_122010_Linux-x86-64.zip"
+
+    - name: Check u01 free disk space
+      ansible.builtin.shell:
+        cmd: "df -P /u01 | awk 'END { print $4 }'"
+      register: u01size
+      failed_when: u01size.stdout|int < u01_size_mb * 1024
+
+    - name: Apply DBRU and one-offs
+      ansible.builtin.shell:
+        cmd: |
+          {{ new_db_home }}/runInstaller -silent -ignorePrereqFailure -waitforcompletion \
+          -applyRU {{ patch_dir }}/GIRU/37957391 \
+          -applyOneOffs \
+          {{ patch_dir }}/OJVM/37847857,{{ patch_dir }}/GIMRP/38509394/36913519,{{ patch_dir }}/GIMRP/38509394/37019735,{{ patch_dir }}/GIMRP/38509394/37082638,{{ patch_dir }}/GIMRP/38509394/37914344,{{ patch_dir }}/GIMRP/38509394/38039345,{{ patch_dir }}/GIMRP/38509394/38191300,{{ patch_dir }}/GIMRP/38509394/38213005,{{ patch_dir }}/GIMRP/38509394/38284844,{{ patch_dir }}/GIMRP/38509394/38295523,{{ patch_dir }}/GIMRP/38509394/38326922,{{ patch_dir }}/GIMRP/38509394/38327069,{{ patch_dir }}/GIMRP/38509394/38387135,{{ patch_dir }}/GIMRP/38509394/38389186,{{ patch_dir }}/GIMRP/38509394/38410961,{{ patch_dir }}/GIMRP/38509394/38447750,{{ patch_dir }}/DBRUOneOff/34672698,{{ patch_dir }}/DBRUOneOff/38170982,{{ patch_dir }}/DBRUOneOff/38599552,{{ patch_dir }}/DBRUOneOff/38219529 \
+          -responsefile {{ patch_dir }}/db_oop.rsp
+      environment:
+        CV_ASSUME_DISTID: OL7
+        NEWDBHOME: "{{ new_db_home }}"
+      register: apply_dbru
+      failed_when: "'Successfully Setup Software' not in apply_dbru.stdout"
+      async: 10800
+      poll: 60
+
+    - name: Output patching success message
+      ansible.builtin.debug:
+        msg: "Patching succeeded. InsaneDBA was here."
+      when: apply_dbru.rc in [6,0]     
